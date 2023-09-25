@@ -1,0 +1,6 @@
+---
+- hosts: ec2instances
+  gather_facts: yes
+  tasks:
+    - name: Run a script with arguments (free form)
+      ansible.builtin.shell: date > /home/ubuntu/test.txt
