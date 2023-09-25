@@ -1,4 +1,4 @@
-ec2instances:
+k3s_cluster:
   children:
     master:
       hosts:
