@@ -56,17 +56,27 @@ data "aws_ami" "ubuntu" {
   owners = ["099720109477"] # Canonical
 }
 
+locals {
+  subnet_ids = [for subnet in aws_subnet.subnets : subnet.id]
+}
+
 resource "aws_instance" "app_server" {
-  count                       = length(var.subnet_configs)
+  count                       = length(var.ec2_configs)
   ami                         = data.aws_ami.ubuntu.id
   associate_public_ip_address = true
-  instance_type               = "t3.micro"
-  subnet_id                   = aws_subnet.subnets[count.index].id
-  vpc_security_group_ids      = [aws_security_group.allow_http_ssh.id]
+  instance_type               = var.ec2_configs[count.index].instance_type
+  subnet_id                   = local.subnet_ids[count.index]
+  vpc_security_group_ids      = [aws_security_group.allow_http_ssh.id, aws_security_group.k3s_security_group.id]
   key_name                    = "TerraformTestKey"
+  user_data                   = <<EOF
+#!/bin/bash
+sudo hostnamectl set-hostname ${var.ec2_configs[count.index].host_name} > /home/ubuntu/hostname.log 2>&1
+EOF
+  user_data_replace_on_change = true
 
   tags = {
     Name      = "AppServerInstance"
     CreatedBy = "Nevus"
+    HostName  = var.ec2_configs[count.index].host_name
   }
 }

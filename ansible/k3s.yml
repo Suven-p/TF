@@ -1,0 +1,94 @@
+---
+- hosts: k3s_cluster
+  gather_facts: false
+  become: false
+  tasks:
+    - name: Check if /tmp/k3s.sh exists
+      stat:
+        path: /tmp/k3s.sh
+      register: k3s_script_stat
+
+    - name: Download k3s script
+      get_url:
+        url: https://get.k3s.io
+        dest: /tmp/k3s.sh
+        owner: ubuntu
+        group: ubuntu
+        mode: 0755
+      when: not k3s_script_stat.stat.exists
+
+- hosts: master
+  tasks:
+    - name: Run installation script
+      ansible.builtin.shell:
+        cmd: /tmp/k3s.sh
+        executable: bash
+        creates: /etc/systemd/system/k3s.service
+      environment:
+        INSTALL_K3S_VERSION: v1.23.5+k3s1
+
+    - name: Enable and check K3s service
+      systemd:
+        name: k3s
+        state: started
+        enabled: yes
+
+    - name: Wait for node-token
+      become: true
+      wait_for:
+        path: "{{ k3s_server_location }}/server/node-token"
+
+    - name: Change file access
+      become: true
+      ansible.builtin.shell:
+        cmd: "chmod 775 -R {{ k3s_server_location }}"
+
+    - name: Read node-token from master
+      become: true
+      slurp:
+        path: "{{ k3s_server_location }}/server/token"
+      register: node_token
+
+    - name: Store Master node-token
+      set_fact:
+        token: "{{ node_token.content | b64decode | regex_replace('\n', '') }}"
+
+    - name: Create directory .kube
+      file:
+        path: ~/.kube
+        state: directory
+        owner: "{{ ansible_user }}"
+        mode: "u=rwx,g=rx,o="
+
+    - name: Copy config file to user home directory
+      become: true
+      copy:
+        src: /etc/rancher/k3s/k3s.yaml
+        dest: ~{{ ansible_user }}/.kube/config
+        remote_src: yes
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "u=rwx,g=rx,o=rx"
+
+    - name: Update .bashrc
+      lineinfile:
+        line: "export KUBECONFIG=/home/ubuntu/.kube/config"
+        path: "/home/ubuntu/.bashrc"
+
+- hosts: worker
+  tasks:
+    - name: Debug
+      debug:
+        msg: "https://{{ groups['master'][0] }}:6443"
+    - name: Debug2
+      debug:
+        msg: "{{ hostvars[groups['master'][0]]['token'] }}"
+    - name: Run installation script
+      ansible.builtin.shell:
+        cmd: /tmp/k3s.sh
+        executable: sh
+        creates: /etc/systemd/system/k3s.service
+      environment:
+        INSTALL_K3S_VERSION: "v1.23.5+k3s1"
+        K3S_URL: "https://master1.suven.com.np:6443"
+        K3S_TOKEN: "{{ hostvars[groups['master'][0]]['token'] }}"

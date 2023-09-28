@@ -18,3 +18,21 @@ variable "subnet_configs" {
     }
   ]
 }
+
+
+variable "ec2_configs" {
+  type = list(object({
+    instance_type = string
+    host_name     = string
+  }))
+  description = "EC2 instance configuration"
+  default = [{
+    instance_type = "t3.micro"
+    host_name     = "master1.suven.com.np"
+    },
+    {
+      instance_type = "t3.micro"
+      host_name     = "worker1.suven.com.np"
+    }
+  ]
+}
