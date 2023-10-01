@@ -65,7 +65,7 @@ resource "aws_instance" "app_server" {
   ami                         = data.aws_ami.ubuntu.id
   associate_public_ip_address = true
   instance_type               = var.ec2_configs[count.index].instance_type
-  subnet_id                   = local.subnet_ids[count.index]
+  subnet_id                   = local.subnet_ids[count.index % length(local.subnet_ids)]
   vpc_security_group_ids      = [aws_security_group.allow_http_ssh.id, aws_security_group.k3s_security_group.id]
   key_name                    = "TerraformTestKey"
   user_data                   = <<EOF
