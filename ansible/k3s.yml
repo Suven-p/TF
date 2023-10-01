@@ -75,20 +75,34 @@
         line: "export KUBECONFIG=/home/ubuntu/.kube/config"
         path: "/home/ubuntu/.bashrc"
 
+    - name: Append os_hosts to /etc/hosts
+      become: yes
+      lineinfile:
+        path: /etc/hosts
+        insertafter: EOF
+        line: "{{ lookup('file', 'os_hosts') }}"
+
 - hosts: worker
   tasks:
-    - name: Debug
-      debug:
-        msg: "https://{{ groups['master'][0] }}:6443"
-    - name: Debug2
-      debug:
-        msg: "{{ hostvars[groups['master'][0]]['token'] }}"
-    - name: Run installation script
+    - name: Append os_hosts to /etc/hosts
+      become: true
+      lineinfile:
+        path: /etc/hosts
+        insertafter: EOF
+        line: "{{ lookup('file', 'os_hosts') }}"
+
+    - name: Install k3s
       ansible.builtin.shell:
         cmd: /tmp/k3s.sh
         executable: sh
-        creates: /etc/systemd/system/k3s.service
+        creates: /etc/systemd/system/k3s-agent.service
       environment:
         INSTALL_K3S_VERSION: "v1.23.5+k3s1"
         K3S_URL: "https://master1.suven.com.np:6443"
         K3S_TOKEN: "{{ hostvars[groups['master'][0]]['token'] }}"
+
+    - name: Enable and check K3s agent service
+      systemd:
+        name: k3s-agent
+        state: started
+        enabled: yes
